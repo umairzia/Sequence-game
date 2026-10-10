@@ -30,7 +30,11 @@ async function ensureJar() {
   if (crypto.createHash('sha256').update(data).digest('hex') !== JAR_SHA256) {
     throw new Error('The database emulator download has the wrong checksum');
   }
-  fs.writeFileSync(file, data);
+  // Both Firebase test files may download at once: write to a file of our
+  // own, then rename, so neither ever starts Java on a half-written jar.
+  var tmp = file + '.' + process.pid + '.part';
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, file);
   return file;
 }
 
