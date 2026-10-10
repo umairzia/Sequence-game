@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sequence – you and a friend against two bots</title>
+  <meta name="description" content="Play the board game Sequence online: you and a friend against two bots. Free, no accounts, no ads.">
+  <meta name="theme-color" content="#0b3b2c">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/sequence.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Sequence home">SEQ<span class="brand-chip"></span>UENCE</a>
+    <button id="room-chip" class="room-chip" type="button" hidden aria-label="Copy the invite link">Room <b id="room-chip-code"></b></button>
+    <span id="conn" class="conn conn-wait" role="status" aria-live="polite"><span class="conn-dot"></span><span id="conn-text">Connecting…</span></span>
+  </header>
+
+  <main id="main">
+    <!-- Shown until js/firebase-config.js is filled in. -->
+    <section id="screen-setup" class="screen panel" hidden>
+      <h1>Almost ready</h1>
+      <p>This copy of the game is not connected to a Firebase project yet, so rooms can't be created.</p>
+      <p>The owner of this site needs to create a free Firebase project, paste its settings into
+        <code>js/firebase-config.js</code> and publish the database rules.
+        The steps are in <code>README.md</code>.</p>
+    </section>
+
+    <!-- Shown when the browser could not run the Firebase SDK. -->
+    <section id="screen-old" class="screen panel" hidden>
+      <h1>Browser too old</h1>
+      <p>Online play needs iOS 11.3 or later, or a recent Chrome, Firefox, Edge or Safari. Please update the browser and try again.</p>
+    </section>
+
+    <section id="screen-home" class="screen panel" hidden>
+      <h1>Sequence</h1>
+      <p class="lead">You and a friend are the <b class="t0">blue</b> team. Two bots are the <b class="t1">red</b> team.
+        Make two rows of five to win.</p>
+
+      <label class="field">Your name
+        <input id="name" type="text" maxlength="20" autocomplete="nickname" autocapitalize="words" placeholder="e.g. Ayesha">
+      </label>
+
+      <div id="resume-box" class="resume" hidden>
+        <button id="btn-resume" class="btn btn-primary" type="button">Continue room <span id="resume-code"></span></button>
+      </div>
+
+      <div class="choice">
+        <h2>Start a new room</h2>
+        <label class="field field-inline">Bots
+          <select id="level">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <button id="btn-create" class="btn btn-primary" type="button">Create a room</button>
+      </div>
+
+      <div class="choice">
+        <h2>Join your friend</h2>
+        <form id="join-form" class="join" autocomplete="off">
+          <label class="field field-inline">Room code
+            <input id="join-code" type="text" maxlength="4" autocapitalize="characters" spellcheck="false" placeholder="ABCD" inputmode="text">
+          </label>
+          <button id="btn-join" class="btn" type="submit">Join</button>
+        </form>
+      </div>
+      <p id="home-msg" class="msg" role="alert" hidden></p>
+
+      <details class="rules">
+        <summary>How to play</summary>
+        <ul>
+          <li>Pick a card from your hand, then put a chip on a space showing that card. Every card is on the board twice.</li>
+          <li>The four corners are free: they count as a chip for everyone.</li>
+          <li><b>Jack of ♦ or ♣</b> (two eyes) is wild: put a chip on any open space.</li>
+          <li><b>Jack of ♠ or ♥</b> (one eye) removes one red chip, except chips in a finished sequence.</li>
+          <li>Five chips in a row (across, down or diagonal) is a <b>sequence</b>. Two sequences win. The second may share one chip with the first.</li>
+          <li>A card is <b>dead</b> when both of its spaces are taken. Once per turn, you can swap it for a new card before you play.</li>
+          <li>Turns go round the table: host, Bot A, guest, Bot B. Teammates can't see each other's cards.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section id="screen-lobby" class="screen panel" hidden>
+      <h1>Room <span id="lobby-code" class="code-big"></span></h1>
+      <p id="lobby-hint">Send this code or the link to your friend.</p>
+      <div class="share">
+        <button id="btn-copy" class="btn" type="button">Copy invite link</button>
+        <button id="btn-share" class="btn" type="button" hidden>Share…</button>
+      </div>
+      <ul id="lobby-players" class="lobby-players"></ul>
+      <div id="lobby-host" hidden>
+        <label class="field field-inline">Bots
+          <select id="lobby-level">
+            <option value="easy">Easy</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <button id="btn-start" class="btn btn-primary" type="button" disabled>Start game</button>
+      </div>
+      <p id="lobby-msg" class="msg"></p>
+      <button id="btn-leave-lobby" class="btn btn-quiet" type="button">Leave room</button>
+    </section>
+
+    <section id="screen-game" class="screen game" hidden>
+      <ol id="seats" class="seats" aria-label="Players in turn order"></ol>
+      <div id="score" class="score"></div>
+      <p id="turn" class="turn" aria-live="polite"></p>
+      <div class="board-area">
+        <div id="board-wrap" class="board-wrap">
+          <div id="board" class="board" role="group" aria-label="Board"></div>
+        </div>
+      </div>
+      <div id="hand" class="hand" aria-label="Your cards"></div>
+      <div class="actions">
+        <button id="btn-swap" class="btn" type="button" hidden>Swap dead card</button>
+        <button id="btn-pass" class="btn" type="button" hidden>Pass (no move possible)</button>
+        <button id="btn-result" class="btn btn-primary" type="button" hidden>Show the result</button>
+      </div>
+      <p id="pile" class="pile"></p>
+      <ul id="log" class="log" aria-label="What happened"></ul>
+      <details id="game-rules" class="rules"><summary>How to play</summary></details>
+      <div class="game-foot">
+        <button id="btn-free-seat" class="btn btn-quiet" type="button" hidden></button>
+        <button id="btn-leave" class="btn btn-quiet" type="button">Leave room</button>
+      </div>
+      <div id="over" class="over" hidden>
+        <div class="over-box" role="dialog" aria-labelledby="over-title">
+          <h2 id="over-title"></h2>
+          <p id="over-text"></p>
+          <div id="over-host" hidden>
+            <label class="field field-inline">Bots
+              <select id="over-level">
+                <option value="easy">Easy</option>
+                <option value="normal">Normal</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <button id="btn-again" class="btn btn-primary" type="button">Play again</button>
+          </div>
+          <p id="over-wait" class="msg" hidden></p>
+          <button id="btn-over-board" class="btn btn-quiet" type="button">Look at the board</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="alert" hidden></div>
+
+  <script src="vendor/firebase/firebase-app-compat.js"></script>
+  <script src="vendor/firebase/firebase-auth-compat.js"></script>
+  <script src="vendor/firebase/firebase-database-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/host.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
